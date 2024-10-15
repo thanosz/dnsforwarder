@@ -230,7 +230,7 @@ func main() {
 	if len(dnsServers) == 0 || len(dnsDomains) == 0 {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
 		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\n Example: \n %v --servers 9.0.0.1 --domains ibm.com,ibmuc.com,ibmmodules.com,s81c.com\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\n Example: \n %v --servers 1.0.0.1 --domains comanya.com,company-resources.com\n\n", os.Args[0])
 		os.Exit(1)
 	}
 
