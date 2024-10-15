@@ -218,7 +218,7 @@ func (handler dnsHandler) run(servers string, domains string) {
 
 func main() {
 	if runtime.GOOS != "darwin" {
-		fmt.Println("This Dns Forwarded is designed for macos")
+		fmt.Println("dnsforwarder is designed for macos")
 		os.Exit(2)
 	}
 	var dnsServers string
