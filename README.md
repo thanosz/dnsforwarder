@@ -29,21 +29,22 @@ When you run `dnsforwarder`, the following happens:
 - **Custom DNS servers**: If the query isn’t in the cache, it will try the custom DNS servers you’ve specified.
 - **Fallback to system DNS**: If the custom DNS servers don’t have the answer, it will then query the system DNS servers from `/etc/resolv.conf`.
 - **Caching results**: Once a DNS query is successfully resolved, the result will be cached for 10 minutes to optimize future lookups.
-- **Automatic updates**: If the `/etc/resolv.conf` file is updated (for example, when you switch VPN connections), `dnsforwarder` automatically detects the changes and updates its list of DNS servers accordingly.
+- **Automatic updates**: `/etc/resolv.conf` file is monitored for updates (for example, when you switch VPN connections). `dnsforwarder` automatically detects the changes and updates its list of DNS servers accordingly.
 
 ### Example Usage
 
 Let’s say you want to forward all DNS queries for `companya.com` and `companya-resources.com` to the DNS server `10.1.1.1` (used by Company A), while still using the system-set DNS servers if the custom DNS server fails. You would run:
 
 ```bash
-./dnsforwarder --servers 10.1.1.1 --domains companya.com,companya-resources.com
+sudo ./dnsforwarder --servers 10.1.1.1 --domains companya.com,companya-resources.com
 ```
 
 This command ensures that DNS queries for Company A’s domains are directed to 10.1.1.1, but it will fall back to the system’s DNS configuration if necessary.
 
 ## Notes
 
-- **Administrative privileges:** Since dnsforwarder needs to create and modify files in the system’s `/etc/resolver` directory, it requires sudo privileges to run.
+- Since `dnsforwarder` needs to create and delete files in the system’s `/etc/resolver` directory, it requires sudo to run.
+- You can set the system DNS server to 127.0.0.1 from the MacOS settings. In this case `dnsforwarder` will use 1.1.1.1 as the system-set DNS server
 
 
 
