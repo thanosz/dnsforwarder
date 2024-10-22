@@ -4,9 +4,9 @@
 
 ## Background
 
-When connected to multiple VPN networks, the last active VPN usually overrides the DNS settings, which can cause issues with resolving domain names on other VPN networks.
+When connected to a signle or multiple VPN networks, the last active VPN usually overrides the DNS settings, which can cause issues with resolving domain names on other the other networks.
 
-For example, let’s say you're connected to your company’s VPN (Company A) with DNS server `10.1.1.1`. If you then connect to another company’s VPN (Company B), which uses DNS server `172.1.1.1`, your DNS queries will now be handled by the DNS of Company B. While you may still have access to Company A’s network, any DNS queries for Company A's internal resources will fail since they won’t be directed to the `10.1.1.1` DNS server.
+For example, let’s say you're connected to your company’s netowrk or VPN (Company A) with DNS server `10.1.1.1`. If you then connect to another company’s VPN (Company B), which uses DNS server `172.1.1.1`, your DNS queries will now be handled by the DNS of Company B. While you may still have access to Company A’s network, any DNS queries for Company A's internal resources will fail since they won’t be directed to the `10.1.1.1` DNS server.
 
 This is where `dnsforwarder` comes in—by allowing you to forward specific domain queries to designated DNS servers based on the VPN you're connected to.
 
