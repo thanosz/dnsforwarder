@@ -17,18 +17,17 @@ import (
 )
 
 type dnsHandler struct {
-	allDnsServers    []string
+	allDnsServers    []string // custom dns servers are in the first elements of []
 	customDnsServers []string
 	customDnsDomains []string
 	dnsCache         expirablecache.Cache[string, dns.Msg]
 }
 
 func (h *dnsHandler) init(customServers string, customDomains string) {
-	h.dnsCache = expirablecache.NewCache[string, dns.Msg]().WithMaxKeys(1000).WithTTL(time.Minute * 10)
-	h.customDnsServers = strings.Split(customServers, ",")
-	h.customDnsDomains = strings.Split(customDomains, ",")
-	fmt.Printf("Using servers '%s' for domains '%s' \n", strings.Join(h.customDnsServers, " "), strings.Join(h.customDnsDomains, " "))
-
+	h.dnsCache = expirablecache.NewCache[string, dns.Msg]().WithMaxKeys(1000).WithTTL(time.Minute * 5)
+	h.customDnsServers = removeDuplicates(strings.Split(customServers, ","))
+	h.customDnsDomains = removeDuplicates(strings.Split(customDomains, ","))
+	fmt.Printf("User input: servers '%s', domains '%s' \n", strings.Join(h.customDnsServers, " "), strings.Join(h.customDnsDomains, " "))
 }
 
 func (h *dnsHandler) observeSystemDNSServers() {
@@ -47,7 +46,7 @@ func (h *dnsHandler) observeSystemDNSServers() {
 			if event.Op&fsnotify.Create == fsnotify.Create ||
 				event.Op&fsnotify.Write == fsnotify.Write {
 				if strings.Contains(event.Name, "resolv.conf") {
-					h.updateSystemDNSServers()
+					h.updateAllDNSServers()
 				}
 			}
 		case err := <-watcher.Errors:
@@ -56,7 +55,7 @@ func (h *dnsHandler) observeSystemDNSServers() {
 	}
 }
 
-func (h *dnsHandler) updateSystemDNSServers() {
+func (h *dnsHandler) updateAllDNSServers() {
 	systemDnsServers := []string{}
 	file, err := os.Open("/etc/resolv.conf")
 	if err != nil {
@@ -92,7 +91,9 @@ func (h *dnsHandler) updateSystemDNSServers() {
 		h.allDnsServers = append(systemDnsServers, "1.1.1.1")
 		fmt.Println("Using 1.1.1.1 insead of system set DNS 127.0.0.1 to avoid loops")
 	}
-	h.allDnsServers = append(h.customDnsServers, systemDnsServers...)
+
+	servers := append(h.customDnsServers, systemDnsServers...)
+	h.allDnsServers = removeDuplicates(servers)
 	fmt.Println("Final DNS list including system-set DNS servers ", h.allDnsServers)
 }
 
@@ -113,7 +114,7 @@ func (h *dnsHandler) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 		m.Answer = append(m.Answer, response.Answer...)
 		fmt.Printf("DNS query for %s served by CACHE \n", question.Name)
 	} else {
-		// Check tofForward DNS query to IBM DNS server
+		// Check query if in custom domains
 		customForward := false
 		for _, domain := range h.customDnsDomains {
 			if strings.Contains(question.Name, domain) {
@@ -121,9 +122,11 @@ func (h *dnsHandler) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 			}
 		}
 
-		// Forward DNS query to defined DNS servers trying the first for custom domains
+		// Forward DNS query to defined DNS servers
 		for i, server := range h.allDnsServers {
-			if !customForward && i == 0 { //the domain is not in custom domains and the server is custom; skip query on the custom server
+			if !customForward && i <= len(h.customDnsServers) {
+				//the domain is not in custom domains;
+				//skip query on the custom servers (system dns set to 127.0.0.1 scenario)
 				continue
 			}
 			forwardedResponse, err = dns.Exchange(r, server+":53")
@@ -165,7 +168,6 @@ func (h *dnsHandler) deleteResolvers() {
 		}
 		fmt.Println("Deleted generated resolver server file ", filename)
 	}
-
 }
 
 func (h *dnsHandler) createResolvers() {
@@ -191,7 +193,7 @@ func (h *dnsHandler) createResolvers() {
 func (handler dnsHandler) run(servers string, domains string) {
 	handler.init(servers, domains)
 	handler.createResolvers()
-	handler.updateSystemDNSServers()
+	handler.updateAllDNSServers()
 	go handler.observeSystemDNSServers()
 	fmt.Println("Starting UDP server...")
 	//handler := dns.DefaultServeMux
@@ -214,6 +216,18 @@ func (handler dnsHandler) run(servers string, domains string) {
 	s := <-sig
 	fmt.Printf("Signal (%v) received, stopping\n", s)
 	handler.deleteResolvers()
+}
+
+func removeDuplicates(s []string) []string {
+	bucket := make(map[string]bool)
+	var result []string
+	for _, str := range s {
+		if _, ok := bucket[str]; !ok {
+			bucket[str] = true
+			result = append(result, str)
+		}
+	}
+	return result
 }
 
 func main() {
