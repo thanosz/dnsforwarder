@@ -28,7 +28,7 @@ When you run `dnsforwarder`, the following happens:
 - **Cache check**: The `dnsforwarder` will first check its cache to see if it already has the result for that query.
 - **Custom DNS servers**: If the query isn’t in the cache, it will try the custom DNS servers you’ve specified.
 - **Fallback to system DNS**: If the custom DNS servers don’t have the answer, it will then query the system DNS servers from `/etc/resolv.conf`.
-- **Caching results**: Once a DNS query is successfully resolved, the result will be cached for 10 minutes to optimize future lookups.
+- **Caching results**: Once a DNS query is successfully resolved, the result will be cached to optimize future lookups.
 - **Automatic updates**: `/etc/resolv.conf` file is monitored for updates (for example, when you switch VPN connections). `dnsforwarder` automatically detects the changes and updates its list of DNS servers accordingly.
 
 ### Example Usage
@@ -43,7 +43,7 @@ This command ensures that DNS queries for Company A’s domains are directed to 
 
 ## Notes
 
-- Since `dnsforwarder` needs to create and delete files in the system’s `/etc/resolver` directory, it requires sudo to run.
+- Since `dnsforwarder` needs to create and delete files in the system’s `/etc/resolver` directory, it requires sudo to run. Alternatively you can manually change ownership of /etc/resolver to your running user.
 - You can set the system DNS server to 127.0.0.1 from the MacOS settings. In this case `dnsforwarder` will use 1.1.1.1 as the system-set DNS server
 
 

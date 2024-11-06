@@ -102,7 +102,7 @@ func (h *dnsHandler) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 	m.SetReply(r)
 	question := r.Question[0]
 	cacheKey := fmt.Sprintf("%s", question.Name)
-	var timeout time.Duration = 0
+	var timeout time.Duration = 0 //0 honors global setting
 
 	// Check the cache for a previous response
 	response, cacheExists := h.dnsCache.Get(cacheKey)
@@ -173,7 +173,12 @@ func (h *dnsHandler) deleteResolvers() {
 func (h *dnsHandler) createResolvers() {
 	dir := "/etc/resolver/"
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		os.Mkdir(dir, 0755)
+		err = os.Mkdir(dir, 0755)
+		if err != nil {
+			fmt.Printf("ERROR: %v. You either need to run with sudo or manually create the folder /etc/resolver and chown it to your user\n", err)
+			os.Exit(3)
+		}
+
 	}
 	// For each domain, create a file and write the servers to it
 	for _, domain := range h.customDnsDomains {
@@ -181,8 +186,8 @@ func (h *dnsHandler) createResolvers() {
 
 		file, err := os.Create(filename)
 		if err != nil {
-			fmt.Printf("Error creating file for domain %s: %v\n", domain, err)
-			continue
+			fmt.Printf("ERROR: %v. You either need to run with sudo or chown /etc/resolver to your user\n", err)
+			os.Exit(3)
 		}
 		defer file.Close()
 		_, err = file.WriteString("nameserver 127.0.0.1\n")
