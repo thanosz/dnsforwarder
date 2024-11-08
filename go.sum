@@ -4,6 +4,8 @@ github.com/fsnotify/fsnotify v1.7.0 h1:8JEhPFa5W2WU7YfeZzPNqzMP6Lwt7L2715Ggo0nos
 github.com/fsnotify/fsnotify v1.7.0/go.mod h1:40Bi/Hjc2AVfZrqy+aj+yEI+/bRxZnMJyTJwOpGvigM=
 github.com/go-pkgz/expirable-cache/v2 v2.0.0 h1:ae5i8016xg7MqPoZ7diS/DtaZXa5V5Nngr/WVWEyWP0=
 github.com/go-pkgz/expirable-cache/v2 v2.0.0/go.mod h1:pZnYQ5KbJ0p+fJeBjukndxwsMZ1uxXq7IbfVcDODY84=
+github.com/idsulik/go-collections v1.2.3 h1:hs7x1k0CoD5KiA1tO7xC5Xohi8/1RnKsOzcQ7ZI/AAc=
+github.com/idsulik/go-collections v1.2.3/go.mod h1:E6UJX5muFSLup+DT5SOBbt7txFaRpimfHABr03z1ot4=
 github.com/miekg/dns v1.1.62 h1:cN8OuEF1/x5Rq6Np+h1epln8OiyPWV+lROx9LxcGgIQ=
 github.com/miekg/dns v1.1.62/go.mod h1:mvDlcItzm+br7MToIKqkglaGhlFMHJ9DTNNWONWXbNQ=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
