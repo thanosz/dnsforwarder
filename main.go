@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -25,18 +26,15 @@ type dnsHandler struct {
 	dnsCache    expirablecache.Cache[string, dns.Msg]
 }
 
-func (h *dnsHandler) init(customServers string, customDomains string) {
+func DnsHandler(servers string, domains string) *dnsHandler {
+	h := new(dnsHandler)
 	h.dnsCache = expirablecache.NewCache[string, dns.Msg]().WithMaxKeys(1000).WithTTL(time.Minute * 10)
 	h.dnsServers = map[string]*set.Set[string]{"custom": set.New[string](), "system": set.New[string]()}
 	h.userDomains = set.New[string]()
-
-	for _, item := range strings.Split(customServers, ",") {
-		h.dnsServers["custom"].Add(item)
-	}
-	for _, item := range strings.Split(customDomains, ",") {
-		h.userDomains.Add(item)
-	}
-	log.Printf("User input: servers '%s', domains '%s' \n", strings.Join(h.dnsServers["custom"].Elements(), " "), strings.Join(h.userDomains.Elements(), " "))
+	h.dnsServers["custom"].AddAll(strings.Split(servers, ",")...)
+	h.userDomains.AddAll(strings.Split(domains, ",")...)
+	log.Printf("User input: servers: %s, domains: %s", h.dnsServers["custom"].Elements(), h.userDomains.Elements())
+	return h
 }
 
 func (h *dnsHandler) observeSystemDNSServers() {
@@ -72,6 +70,7 @@ func (h *dnsHandler) updateAllDNSServers() {
 	}
 	defer file.Close()
 
+	h.dnsCache.Purge() //we most probably changed network
 	h.dnsServers["system"].Clear()
 
 	scanner := bufio.NewScanner(file)
@@ -98,7 +97,7 @@ func (h *dnsHandler) updateAllDNSServers() {
 	if err := scanner.Err(); err != nil {
 		log.Println("Scanner error")
 	}
-	log.Printf("All DNS Servers: [custom]: %s - [system]: %s", h.dnsServers["custom"].Elements(), h.dnsServers["system"].Elements())
+	log.Printf("All DNS Servers: custom: %s, system: %s", h.dnsServers["custom"].Elements(), h.dnsServers["system"].Elements())
 }
 
 func (h *dnsHandler) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
@@ -115,7 +114,7 @@ func (h *dnsHandler) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 	if cacheExists {
 		// Serve the response from the cache
 		m.Answer = append(m.Answer, response.Answer...)
-		log.Printf("DNS query for %s served by CACHE \n", question.Name)
+		log.Printf("DNS query for %s served by CACHE", question.Name)
 	} else {
 		queryServers := []string{}
 		// Check query if in custom domains
@@ -128,18 +127,23 @@ func (h *dnsHandler) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 		queryServers = append(queryServers, h.dnsServers["system"].Elements()...)
 
 		// Forward DNS query to defined DNS servers
-		for _, server := range queryServers {
-			forwardedResponse, err = dns.Exchange(r, server+":53")
-			if err == nil {
-				log.Printf("DNS query for %s served by %s \n", question.Name, server)
-				break
-			} else {
-				log.Printf("DNS query for %s failed using server %s, error was: %s \n", question.Name, server, err)
+		if len(queryServers) == 0 {
+			err = errors.New("Empty server list")
+		} else {
+			for _, server := range queryServers {
+				forwardedResponse, err = dns.Exchange(r, server+":53")
+				if err == nil {
+					log.Printf("DNS query for %s served by %s", question.Name, server)
+					break
+				} else {
+					log.Printf("DNS query for %s failed using server %s, error was: %s", question.Name, server, err)
 
+				}
 			}
 		}
+
 		if err != nil {
-			log.Println("Error forwarding DNS request; all servers tried")
+			log.Printf("Error forwarding DNS request: %s", err)
 			m.SetRcode(r, dns.RcodeServerFailure)
 			w.WriteMsg(m)
 			return
@@ -165,7 +169,7 @@ func (h *dnsHandler) deleteResolvers() {
 		filename := "/etc/resolver/" + domain
 		err := os.Remove(filename)
 		if err != nil {
-			log.Printf("Error removing file %s: %v\n", filename, err)
+			log.Printf("Error removing file %s: %v", filename, err)
 			continue
 		}
 		log.Println("Deleted generated resolver server file ", filename)
@@ -180,7 +184,6 @@ func (h *dnsHandler) createResolvers() {
 			log.Printf("ERROR: %v. You either need to run with sudo or manually create the folder /etc/resolver and chown it to your user\n", err)
 			os.Exit(3)
 		}
-
 	}
 	// For each domain, create a file and write the servers to it
 	for _, domain := range h.userDomains.Elements() {
@@ -197,32 +200,29 @@ func (h *dnsHandler) createResolvers() {
 	}
 }
 
-func (handler dnsHandler) run(servers string, domains string) {
-	handler.init(servers, domains)
+func (handler *dnsHandler) run() {
 	handler.createResolvers()
 	handler.updateAllDNSServers()
 	go handler.observeSystemDNSServers()
+	defer handler.deleteResolvers()
 	log.Println("Starting DNS Local UDP server...")
-	//handler := dns.DefaultServeMux
 	dns.HandleFunc(".", handler.handleDNSRequest)
 	server := &dns.Server{
-		Addr: ":53",
-		Net:  "udp",
-		//Handler:   handler,
+		Addr:      ":53",
+		Net:       "udp",
 		UDPSize:   65535,
 		ReusePort: true,
 	}
 	go func() {
 		err := server.ListenAndServe()
 		if err != nil {
-			panic(err)
+			log.Panic(err)
 		}
 	}()
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	s := <-sig
 	log.Printf("Signal (%v) received, stopping\n", s)
-	handler.deleteResolvers()
 }
 
 func removeDuplicates(s []string) []string {
@@ -239,8 +239,7 @@ func removeDuplicates(s []string) []string {
 
 func main() {
 	if runtime.GOOS != "darwin" {
-		log.Println("dnsforwarder is designed for macos")
-		os.Exit(2)
+		log.Fatal("dnsforwarder is designed for macos")
 	}
 	var dnsServers string
 	var dnsDomains string
@@ -255,6 +254,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	handler := new(dnsHandler)
-	handler.run(dnsServers, dnsDomains)
+	DnsHandler(dnsServers, dnsDomains).run()
 }
