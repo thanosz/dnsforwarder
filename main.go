@@ -125,10 +125,16 @@ func (h *dnsHandler) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 			}
 		}
 		queryServers = append(queryServers, h.dnsServers["system"].Elements()...)
+		if len(queryServers) == 0 {
+			//fallback to custom (in case the custom is set to system and
+			//its used with UTM; => mDNSresponder cannot run (port used))
+			log.Printf("Empty server list; fallback to custom dnsServers")
+			queryServers = append(queryServers, h.dnsServers["custom"].Elements()...)
+		}
 
 		// Forward DNS query to defined DNS servers
 		if len(queryServers) == 0 {
-			err = errors.New("Empty server list")
+			err = errors.New("empty server list")
 		} else {
 			for _, server := range queryServers {
 				forwardedResponse, err = dns.Exchange(r, server+":53")
@@ -143,7 +149,7 @@ func (h *dnsHandler) handleDNSRequest(w dns.ResponseWriter, r *dns.Msg) {
 		}
 
 		if err != nil {
-			log.Printf("Error forwarding DNS request: %s", err)
+			log.Printf("Error (cannot recover) forwarding DNS request: %s", err)
 			m.SetRcode(r, dns.RcodeServerFailure)
 			w.WriteMsg(m)
 			return
@@ -170,6 +176,7 @@ func (h *dnsHandler) deleteResolvers() {
 		err := os.Remove(filename)
 		if err != nil {
 			log.Printf("Error removing file %s: %v", filename, err)
+			time.Sleep(time.Second)
 			continue
 		}
 		log.Println("Deleted generated resolver server file ", filename)
@@ -222,7 +229,7 @@ func (handler *dnsHandler) run() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	s := <-sig
-	log.Printf("Signal (%v) received, stopping\n", s)
+	log.Printf("Signal (%v) received, stopping...\n", s)
 }
 
 func removeDuplicates(s []string) []string {
@@ -253,6 +260,5 @@ func main() {
 		fmt.Fprintf(os.Stderr, "\n Example: \n %v --servers 1.0.0.1 --domains comanya.com,company-resources.com\n\n", os.Args[0])
 		os.Exit(1)
 	}
-
 	DnsHandler(dnsServers, dnsDomains).run()
 }
