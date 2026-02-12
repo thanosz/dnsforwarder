@@ -176,10 +176,11 @@ func (h *dnsHandler) deleteResolvers() {
 		err := os.Remove(filename)
 		if err != nil {
 			log.Printf("Error removing file %s: %v", filename, err)
-			time.Sleep(time.Second)
-			continue
+
+		} else {
+			log.Println("Deleted generated resolver server file ", filename)
+
 		}
-		log.Println("Deleted generated resolver server file ", filename)
 	}
 }
 
@@ -203,15 +204,19 @@ func (h *dnsHandler) createResolvers() {
 		}
 		defer file.Close()
 		_, err = file.WriteString("nameserver 127.0.0.1\n")
+		if err != nil {
+			log.Printf("ERROR: %v. Could not write to file %s\n", err, filename)
+			os.Exit(3)
+		}
 		log.Println("Successfully created resolver server file ", filename)
 	}
 }
 
 func (handler *dnsHandler) run() {
+	defer handler.deleteResolvers()
 	handler.createResolvers()
 	handler.updateAllDNSServers()
 	go handler.observeSystemDNSServers()
-	defer handler.deleteResolvers()
 	log.Println("Starting DNS Local UDP server...")
 	dns.HandleFunc(".", handler.handleDNSRequest)
 	server := &dns.Server{
