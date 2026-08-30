@@ -60,6 +60,7 @@ func (h *dnsHandler) observeSystemDNSServers() {
 			log.Println("fsnotify error:", err)
 		}
 	}
+
 }
 
 func (h *dnsHandler) updateAllDNSServers() {
@@ -228,6 +229,7 @@ func (handler *dnsHandler) run() {
 	go func() {
 		err := server.ListenAndServe()
 		if err != nil {
+			handler.deleteResolvers()
 			log.Panic(err)
 		}
 	}()
